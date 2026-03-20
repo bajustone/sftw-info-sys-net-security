@@ -1,0 +1,8 @@
+.env
+
+# Certificate and key files
+certs/
+*.key
+*.crt
+*.csr
+*.srl

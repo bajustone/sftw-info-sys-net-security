@@ -1,0 +1,26 @@
+# Docker Compose for Apache HTTPS Web Server
+# Runs an Apache server with SSL/TLS using a signed user certificate.
+#
+# Prerequisites:
+#   Place the following files in the ../certs/ directory (project root):
+#     - user_cert.crt    : Signed server certificate
+#     - user_private.key : Unencrypted private key
+#     - ca.crt           : CA root certificate
+#
+# Usage:
+#   docker compose up --build
+#
+# Verification:
+#   curl -vk https://localhost
+#   openssl s_client -connect localhost:443 -CAfile ../certs/ca.crt
+
+services:
+  webserver:
+    build: .
+    ports:
+      - "443:443"
+    volumes:
+      # Mount certificate files read-only from the shared certs/ directory (project root)
+      - ../certs/user_cert.crt:/etc/ssl/certs/user_cert.crt:ro
+      - ../certs/user_private.key:/etc/ssl/private/user_private.key:ro
+      - ../certs/ca.crt:/etc/ssl/certs/ca.crt:ro
