@@ -1,0 +1,90 @@
+#!/bin/bash
+set -e
+
+# Discover interfaces by their assigned IPs
+WAN_IF=$(ip -4 addr | grep '10.0.0.2/' | awk '{print $NF}')
+LAN_IF=$(ip -4 addr | grep '192.168.1.1/' | awk '{print $NF}')
+DMZ_IF=$(ip -4 addr | grep '192.168.2.1/' | awk '{print $NF}')
+
+echo "=== Interface Mapping ==="
+echo "WAN = $WAN_IF (10.0.0.2)"
+echo "LAN = $LAN_IF (192.168.1.1)"
+echo "DMZ = $DMZ_IF (192.168.2.1)"
+echo ""
+
+# Flush existing rules
+iptables -F
+iptables -t nat -F
+iptables -X 2>/dev/null || true
+
+# ===========================
+# Default Policies: DROP all
+# ===========================
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# ===========================
+# Loopback
+# ===========================
+iptables -A INPUT -i lo -j ACCEPT
+
+# ===========================
+# Stateful: allow established/related
+# ===========================
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# ===========================
+# NAT: Masquerade outbound traffic through WAN
+# ===========================
+iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
+
+# ===========================
+# WAN RULES
+# ===========================
+
+# Port Forward: HTTP (80) from WAN -> DMZ web server
+iptables -t nat -A PREROUTING -i "$WAN_IF" -p tcp --dport 80 -j DNAT --to-destination 192.168.2.100:80
+iptables -A FORWARD -i "$WAN_IF" -o "$DMZ_IF" -p tcp --dport 80 -d 192.168.2.100 -j ACCEPT
+
+# Port Forward: HTTPS (443) from WAN -> DMZ web server
+iptables -t nat -A PREROUTING -i "$WAN_IF" -p tcp --dport 443 -j DNAT --to-destination 192.168.2.100:443
+iptables -A FORWARD -i "$WAN_IF" -o "$DMZ_IF" -p tcp --dport 443 -d 192.168.2.100 -j ACCEPT
+
+# ===========================
+# DMZ RULES
+# ===========================
+
+# Allow DMZ server outbound TCP to internet (via WAN)
+iptables -A FORWARD -i "$DMZ_IF" -o "$WAN_IF" -p tcp -j ACCEPT
+
+# Allow DMZ to ping LAN (ICMP)
+iptables -A FORWARD -i "$DMZ_IF" -o "$LAN_IF" -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A FORWARD -i "$LAN_IF" -o "$DMZ_IF" -p icmp --icmp-type echo-reply -j ACCEPT
+
+# ===========================
+# LAN RULES
+# ===========================
+
+# Allow LAN to access internet
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT
+
+# ===========================
+# Allow ping to firewall from LAN and DMZ (for testing)
+# ===========================
+iptables -A INPUT -i "$LAN_IF" -p icmp -j ACCEPT
+iptables -A INPUT -i "$DMZ_IF" -p icmp -j ACCEPT
+
+# ===========================
+# Everything else: blocked by default DROP policy
+# ===========================
+
+echo ""
+echo "=== Firewall rules applied successfully ==="
+echo ""
+echo "--- FILTER TABLE ---"
+iptables -L -v -n
+echo ""
+echo "--- NAT TABLE ---"
+iptables -t nat -L -v -n
