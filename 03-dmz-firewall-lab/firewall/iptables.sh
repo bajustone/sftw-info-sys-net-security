@@ -12,6 +12,11 @@ echo "LAN = $LAN_IF (192.168.1.1)"
 echo "DMZ = $DMZ_IF (192.168.2.1)"
 echo ""
 
+# Fix default route to go via WAN gateway (Docker may set it to wrong interface)
+ip route replace default via 10.0.0.254 dev "$WAN_IF"
+echo "Default route set via WAN (10.0.0.254)"
+echo ""
+
 # Flush existing rules
 iptables -F
 iptables -t nat -F
@@ -39,6 +44,9 @@ iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 # NAT: Masquerade outbound traffic through WAN
 # ===========================
 iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
+
+# NAT: Masquerade DNAT'd traffic entering DMZ (so DMZ server sees firewall as source)
+iptables -t nat -A POSTROUTING -o "$DMZ_IF" -s 10.0.0.0/24 -j MASQUERADE
 
 # ===========================
 # WAN RULES
