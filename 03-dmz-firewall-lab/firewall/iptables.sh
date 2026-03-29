@@ -51,7 +51,6 @@ iptables -t nat -A POSTROUTING -o "$DMZ_IF" -s 10.0.0.0/24 -j MASQUERADE
 # NAT Hairpin: Allow LAN clients to reach DMZ via firewall's WAN IP
 iptables -t nat -A PREROUTING -i "$LAN_IF" -p tcp --dport 80 -d 10.0.0.2 -j DNAT --to-destination 192.168.2.100:80
 iptables -t nat -A PREROUTING -i "$LAN_IF" -p tcp --dport 443 -d 10.0.0.2 -j DNAT --to-destination 192.168.2.100:443
-iptables -t nat -A POSTROUTING -o "$DMZ_IF" -s 192.168.1.0/24 -j MASQUERADE
 
 # ===========================
 # WAN RULES
