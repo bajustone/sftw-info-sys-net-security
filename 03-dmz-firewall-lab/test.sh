@@ -81,6 +81,45 @@ fi
 echo ""
 
 echo "========================================"
+echo " IDS (Suricata) Verification Tests"
+echo "========================================"
+echo ""
+
+# Test 8: Suricata is running
+echo "--- Test 8: Suricata IDS is running ---"
+if docker exec firewall pgrep suricata > /dev/null 2>&1; then
+    pass "Suricata is running in the firewall container"
+else
+    fail "Suricata is not running"
+fi
+echo ""
+
+# Test 9: Suricata detects nmap scan
+echo "--- Test 9: Suricata detects nmap SYN scan ---"
+docker exec firewall sh -c '> /var/log/suricata/fast.log' 2>/dev/null
+docker exec attacker nmap -sS -T4 --top-ports 20 10.0.0.2 > /dev/null 2>&1
+sleep 3
+ALERTS=$(docker exec firewall cat /var/log/suricata/fast.log 2>/dev/null | grep -i "scan" | head -5)
+if [ -n "$ALERTS" ]; then
+    pass "Suricata generated scan alerts"
+    echo "  Sample alerts:"
+    echo "$ALERTS" | head -3 | sed 's/^/    /'
+else
+    fail "No scan alerts generated (Suricata may need more time or rules may not be loaded)"
+fi
+echo ""
+
+# Test 10: IDS mode confirmation (traffic still passes despite alerts)
+echo "--- Test 10: IDS mode - traffic NOT blocked after alerts ---"
+RESULT=$(docker exec attacker curl -s --max-time 5 http://10.0.0.2:80 2>/dev/null)
+if echo "$RESULT" | grep -q "DMZ Web Server"; then
+    pass "IDS mode confirmed — traffic still passes (alerts generated, not blocked)"
+else
+    fail "Traffic appears blocked — this should not happen in IDS mode"
+fi
+echo ""
+
+echo "========================================"
 echo " Firewall Rules Summary"
 echo "========================================"
 docker exec firewall iptables -L -v -n --line-numbers

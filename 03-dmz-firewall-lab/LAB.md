@@ -7,7 +7,7 @@ Internet (WAN: 10.0.0.0/24)
     │
     ├── attacker (Kali) ─── 10.0.0.100
     │
-    └── firewall (Alpine + iptables) ─── 10.0.0.2
+    └── firewall (Alpine + iptables + Suricata IDS) ─── 10.0.0.2
             │
             ├── LAN (192.168.1.0/24)
             │     └── lan-client (Ubuntu) ─── 192.168.1.100
@@ -20,7 +20,7 @@ Internet (WAN: 10.0.0.0/24)
 
 | Container    | Role                        | Networks        | IP(s)                                    |
 |--------------|-----------------------------|-----------------|------------------------------------------|
-| firewall     | Replaces pfSense (iptables) | WAN, LAN, DMZ   | 10.0.0.2 / 192.168.1.1 / 192.168.2.1    |
+| firewall     | Replaces pfSense (iptables + Suricata IDS) | WAN, LAN, DMZ   | 10.0.0.2 / 192.168.1.1 / 192.168.2.1    |
 | lan-client   | Internal user workstation   | LAN             | 192.168.1.100                            |
 | dmz-server   | Public-facing nginx server  | DMZ             | 192.168.2.100                            |
 | attacker     | External threat (Kali)      | WAN             | 10.0.0.100                               |
@@ -104,4 +104,80 @@ docker exec attacker nmap -sS 10.0.0.2
 
 # Try to access the web server via port forward
 docker exec attacker curl -s http://10.0.0.2
+```
+
+---
+
+## IDS (Intrusion Detection System) - Suricata
+
+Suricata runs in **IDS mode** on the firewall's WAN interface. It detects and alerts on suspicious traffic but does **NOT block** it.
+
+### How It Works
+
+- Suricata monitors all traffic arriving on the WAN interface using AF-PACKET
+- Custom rules detect nmap scans (SYN, NULL, XMAS, FIN), ping sweeps, and HTTP recon
+- Alerts are written to `/var/log/suricata/fast.log` (human-readable) and `/var/log/suricata/eve.json` (JSON)
+- `checksum-validation: no` is set because Docker virtual interfaces have invalid checksums (equivalent to disabling hardware offloading on pfSense)
+
+### Practice 5: Verify Suricata is Running
+```bash
+# Check Suricata process
+docker exec firewall pgrep suricata
+
+# View Suricata startup log
+docker exec firewall cat /var/log/suricata/suricata.log
+```
+
+### Practice 6: Run Scans and Generate Alerts
+```bash
+# SYN Scan (most common)
+docker exec attacker nmap -sS 10.0.0.2
+
+# Aggressive Scan (OS detection, version detection, scripts)
+docker exec attacker nmap -A 10.0.0.2
+
+# XMAS Scan (FIN+PSH+URG flags)
+docker exec attacker nmap -sX 10.0.0.2
+
+# NULL Scan (no flags)
+docker exec attacker nmap -sN 10.0.0.2
+
+# FIN Scan
+docker exec attacker nmap -sF 10.0.0.2
+```
+
+### Practice 7: View and Interpret Alerts
+```bash
+# View alerts (human-readable)
+bash view-alerts.sh
+
+# Follow alerts in real-time (run in one terminal, scan in another)
+bash view-alerts.sh --follow
+
+# Or directly from the container
+docker exec firewall cat /var/log/suricata/fast.log
+
+# View JSON logs for detailed analysis
+docker exec firewall cat /var/log/suricata/eve.json
+```
+
+Each alert shows: timestamp, priority, signature name, source IP, destination IP.
+
+### Expected Alerts
+
+| Scan Type | Expected Alert |
+|-----------|---------------|
+| `nmap -sS` | LOCAL SCAN Nmap SYN Scan Detected |
+| `nmap -sN` | LOCAL SCAN Nmap NULL Scan |
+| `nmap -sX` | LOCAL SCAN Nmap XMAS Scan |
+| `nmap -sF` | LOCAL SCAN Nmap FIN Scan |
+| `nmap -A`  | LOCAL SCAN Nmap Service Detection |
+| `ping`     | LOCAL SCAN ICMP Ping Sweep |
+| `curl http://10.0.0.2` | LOCAL POLICY HTTP Request to DMZ from External |
+
+### Practice 8: Confirm IDS Mode (Not IPS)
+```bash
+# After generating alerts, confirm traffic still passes (IDS = alert only, no blocking)
+docker exec attacker curl -s http://10.0.0.2
+# Should still return the DMZ web server page
 ```

@@ -1,0 +1,70 @@
+%YAML 1.1
+---
+
+vars:
+  address-groups:
+    HOME_NET: "[10.0.0.2/32, 192.168.1.0/24, 192.168.2.0/24]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "[192.168.2.100]"
+    DNS_SERVERS: "any"
+    SMTP_SERVERS: "any"
+    SQL_SERVERS: "any"
+    TELNET_SERVERS: "any"
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    SSH_PORTS: "22"
+
+default-rule-path: /var/lib/suricata/rules
+rule-files:
+  - suricata.rules
+
+outputs:
+  - fast:
+      enabled: yes
+      filename: /var/log/suricata/fast.log
+      append: yes
+
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      types:
+        - alert:
+            payload: yes
+            payload-printable: yes
+        - http:
+            extended: yes
+        - stats:
+            totals: yes
+            threads: no
+
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      append: yes
+      interval: 30
+
+pcap:
+  - interface: WAN_INTERFACE_PLACEHOLDER
+
+detect:
+  profile: medium
+  sgh-mpm-context: auto
+
+logging:
+  default-log-level: notice
+  outputs:
+    - console:
+        enabled: yes
+    - file:
+        enabled: yes
+        filename: /var/log/suricata/suricata.log
+        level: info
+
+stream:
+  memcap: 32mb
+  checksum-validation: no
+
+runmode: autofp
+max-pending-packets: 1024

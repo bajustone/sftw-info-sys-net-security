@@ -1,0 +1,32 @@
+\contentsline {section}{\numberline {1}Introduction}{2}{}%
+\contentsline {section}{\numberline {2}Task 1: Introduction to Signcryption}{2}{}%
+\contentsline {subsection}{\numberline {2.1}a) Definition of Signcryption}{2}{}%
+\contentsline {subsection}{\numberline {2.2}b) Limitations of the Traditional Sign-then-Encrypt Approach}{2}{}%
+\contentsline {subsection}{\numberline {2.3}c) Main Advantages of Signcryption}{3}{}%
+\contentsline {section}{\numberline {3}Task 2: Architecture and Working Mechanism}{3}{}%
+\contentsline {subsection}{\numberline {3.1}a) General Process of Signcryption and Unsigncryption}{3}{}%
+\contentsline {subsection}{\numberline {3.2}b) Main Components}{3}{}%
+\contentsline {subsection}{\numberline {3.3}c) Data Flow Diagram}{3}{}%
+\contentsline {section}{\numberline {4}Task 3: Security Properties}{3}{}%
+\contentsline {subsection}{\numberline {4.1}Confidentiality}{4}{}%
+\contentsline {subsection}{\numberline {4.2}Integrity}{4}{}%
+\contentsline {subsection}{\numberline {4.3}Authentication}{4}{}%
+\contentsline {subsection}{\numberline {4.4}Non-repudiation}{4}{}%
+\contentsline {subsection}{\numberline {4.5}Forward Secrecy}{4}{}%
+\contentsline {section}{\numberline {5}Task 4: Comparative Analysis of Selected Papers}{5}{}%
+\contentsline {subsection}{\numberline {5.1}a) Summary of Selected Papers}{5}{}%
+\contentsline {subsubsection}{\numberline {5.1.1}Paper 1: Zheng (1997) --- ``Digital Signcryption''~\cite {zheng1997}}{5}{}%
+\contentsline {subsubsection}{\numberline {5.1.2}Paper 2: Baek, Steinfeld, and Zheng (2002) --- ``Formal Proofs for Signcryption''~\cite {baek2002}}{5}{}%
+\contentsline {subsubsection}{\numberline {5.1.3}Paper 3: Boyen (2003) --- ``Multipurpose Identity-Based Signcryption''~\cite {boyen2003}}{5}{}%
+\contentsline {subsection}{\numberline {5.2}b) Comparative Analysis}{5}{}%
+\contentsline {subsection}{\numberline {5.3}c) Comparison Table}{6}{}%
+\contentsline {section}{\numberline {6}Task 5: Applications of Signcryption}{6}{}%
+\contentsline {subsection}{\numberline {6.1}Secure Email Systems}{6}{}%
+\contentsline {subsection}{\numberline {6.2}IoT Security}{6}{}%
+\contentsline {subsection}{\numberline {6.3}Blockchain and Cryptocurrencies}{6}{}%
+\contentsline {subsection}{\numberline {6.4}E-Government and Financial Systems}{6}{}%
+\contentsline {section}{\numberline {7}Task 6: Critical Evaluation}{7}{}%
+\contentsline {subsection}{\numberline {7.1}a) Challenges and Limitations}{7}{}%
+\contentsline {subsection}{\numberline {7.2}b) Possible Improvements and Future Research Directions}{7}{}%
+\contentsline {subsection}{\numberline {7.3}c) Overall Assessment}{7}{}%
+\contentsline {section}{\numberline {8}Conclusion}{8}{}%

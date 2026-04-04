@@ -1,0 +1,26 @@
+# Custom IDS Rules for DMZ Firewall Lab
+# SIDs 1000001+ (local rule range)
+
+# Detect Nmap SYN Scan (multiple SYN-only packets in short window)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap SYN Scan Detected"; flags:S; threshold:type threshold, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000001; rev:3;)
+
+# Detect Nmap TCP Connect Scan
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap TCP Connect Scan"; flags:S; threshold:type threshold, track by_src, count 10, seconds 30; classtype:attempted-recon; sid:1000002; rev:3;)
+
+# Detect Nmap NULL Scan (no flags set)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap NULL Scan"; flags:0; classtype:attempted-recon; sid:1000003; rev:2;)
+
+# Detect Nmap XMAS Scan (FIN+PSH+URG flags)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap XMAS Scan"; flags:FPU; classtype:attempted-recon; sid:1000004; rev:2;)
+
+# Detect Nmap FIN Scan
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap FIN Scan"; flags:F,12; classtype:attempted-recon; sid:1000005; rev:2;)
+
+# Detect Nmap Aggressive Scan (high volume service detection)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap Service Detection"; flags:S; threshold:type threshold, track by_src, count 20, seconds 15; classtype:attempted-recon; sid:1000006; rev:3;)
+
+# Detect ICMP ping sweep
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN ICMP Ping Sweep"; itype:8; threshold:type threshold, track by_src, count 3, seconds 10; classtype:attempted-recon; sid:1000007; rev:3;)
+
+# Detect HTTP requests from external to DMZ web server
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"LOCAL POLICY HTTP Request to DMZ from External"; flow:to_server,established; classtype:policy-violation; sid:1000008; rev:1;)
