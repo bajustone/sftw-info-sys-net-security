@@ -1,26 +1,33 @@
-# Custom IDS Rules for DMZ Firewall Lab
+# Custom IPS Rules for DMZ Firewall Lab
 # SIDs 1000001+ (local rule range)
+# Mode: IPS (inline) — "drop" rules instruct Suricata to drop the packet
+# and emit a drop event that block-offenders.sh converts into a 1h ipset block.
 
-# Detect Nmap SYN Scan (multiple SYN-only packets in short window)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap SYN Scan Detected"; flags:S; threshold:type threshold, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000001; rev:3;)
+# Drop Nmap SYN Scan (multiple SYN-only packets in short window).
+# Exclude published web ports so that normal HTTP clients (including the attacker
+# running through the Web App Security labs) aren't mistaken for a port scan.
+drop tcp $EXTERNAL_NET any -> $HOME_NET ![80,443] (msg:"LOCAL SCAN Nmap SYN Scan Detected"; flags:S; threshold:type threshold, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000001; rev:5;)
 
-# Detect Nmap TCP Connect Scan
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap TCP Connect Scan"; flags:S; threshold:type threshold, track by_src, count 10, seconds 30; classtype:attempted-recon; sid:1000002; rev:3;)
+# Drop Nmap TCP Connect Scan (same exclusion rationale as SID 1000001)
+drop tcp $EXTERNAL_NET any -> $HOME_NET ![80,443] (msg:"LOCAL SCAN Nmap TCP Connect Scan"; flags:S; threshold:type threshold, track by_src, count 10, seconds 30; classtype:attempted-recon; sid:1000002; rev:5;)
 
-# Detect Nmap NULL Scan (no flags set)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap NULL Scan"; flags:0; classtype:attempted-recon; sid:1000003; rev:2;)
+# Drop Nmap NULL Scan (no flags set)
+drop tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap NULL Scan"; flags:0; classtype:attempted-recon; sid:1000003; rev:3;)
 
-# Detect Nmap XMAS Scan (FIN+PSH+URG flags)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap XMAS Scan"; flags:FPU; classtype:attempted-recon; sid:1000004; rev:2;)
+# Drop Nmap XMAS Scan (FIN+PSH+URG flags)
+drop tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap XMAS Scan"; flags:FPU; classtype:attempted-recon; sid:1000004; rev:3;)
 
-# Detect Nmap FIN Scan
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap FIN Scan"; flags:F,12; classtype:attempted-recon; sid:1000005; rev:2;)
+# Drop Nmap FIN Scan
+drop tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap FIN Scan"; flags:F,12; classtype:attempted-recon; sid:1000005; rev:3;)
 
-# Detect Nmap Aggressive Scan (high volume service detection)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN Nmap Service Detection"; flags:S; threshold:type threshold, track by_src, count 20, seconds 15; classtype:attempted-recon; sid:1000006; rev:3;)
+# Drop Nmap Aggressive Scan (high volume service detection). Same port exclusion.
+drop tcp $EXTERNAL_NET any -> $HOME_NET ![80,443] (msg:"LOCAL SCAN Nmap Service Detection"; flags:S; threshold:type threshold, track by_src, count 20, seconds 15; classtype:attempted-recon; sid:1000006; rev:5;)
 
-# Detect ICMP ping sweep
-alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN ICMP Ping Sweep"; itype:8; threshold:type threshold, track by_src, count 3, seconds 10; classtype:attempted-recon; sid:1000007; rev:3;)
+# Drop ICMP ping sweep (quick repeated echo-requests from same source)
+drop icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"LOCAL SCAN ICMP Ping Sweep"; itype:8; threshold:type threshold, track by_src, count 3, seconds 10; classtype:attempted-recon; sid:1000007; rev:4;)
 
-# Detect HTTP requests from external to DMZ web server
+# Alert (policy) on HTTP requests from external to DMZ web server — published service, do not drop
 alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"LOCAL POLICY HTTP Request to DMZ from External"; flow:to_server,established; classtype:policy-violation; sid:1000008; rev:1;)
+
+# Drop Nmap -A User-Agent (service/version probe against WAN hitting DMZ web server)
+drop http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"LOCAL SCAN Nmap Service/Version Probe User-Agent"; flow:to_server,established; http.user_agent; content:"Nmap"; nocase; classtype:attempted-recon; sid:1000009; rev:1;)

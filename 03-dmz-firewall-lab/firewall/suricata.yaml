@@ -19,6 +19,12 @@ default-rule-path: /var/lib/suricata/rules
 rule-files:
   - suricata.rules
 
+action-order:
+  - drop
+  - reject
+  - alert
+  - pass
+
 outputs:
   - fast:
       enabled: yes
@@ -33,6 +39,10 @@ outputs:
         - alert:
             payload: yes
             payload-printable: yes
+            metadata: yes
+        - drop:
+            alerts: yes
+            flows: all
         - http:
             extended: yes
         - stats:
@@ -45,8 +55,12 @@ outputs:
       append: yes
       interval: 30
 
-pcap:
-  - interface: WAN_INTERFACE_PLACEHOLDER
+nfq:
+  mode: accept
+  repeat-mark: 1
+  repeat-mask: 1
+  fail-open: no
+  batchcount: 20
 
 detect:
   profile: medium

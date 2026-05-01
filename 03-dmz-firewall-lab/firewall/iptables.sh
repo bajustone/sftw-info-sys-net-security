@@ -23,6 +23,18 @@ iptables -t nat -F
 iptables -X 2>/dev/null || true
 
 # ===========================
+# IPS Block List (Suricata "Block Offenders (SRC)" equivalent)
+#   - ipset entries expire after 3600s (matches pfSense "Remove Blocked Hosts Interval: 1 Hour")
+#   - block-offenders.sh populates this set by tailing eve.json drop events
+# ===========================
+ipset create suricata_block hash:ip timeout 3600 -exist
+ipset flush suricata_block
+
+# Drop everything from blocked source IPs — applied before any other rule
+iptables -I INPUT   1 -m set --match-set suricata_block src -j DROP
+iptables -I FORWARD 1 -m set --match-set suricata_block src -j DROP
+
+# ===========================
 # Default Policies: DROP all
 # ===========================
 iptables -P INPUT DROP
@@ -39,6 +51,14 @@ iptables -A INPUT -i lo -j ACCEPT
 # ===========================
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# ===========================
+# IPS inline inspection: send WAN-sourced new/invalid packets to Suricata (NFQUEUE 0)
+#   - Suricata re-marks accepted packets with 0x1 (repeat-mark) so we skip re-queueing them
+#   - queue-bypass lets traffic flow if Suricata is down (fail-open)
+# ===========================
+iptables -A INPUT   -i "$WAN_IF" -m mark ! --mark 0x1/0x1 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -A FORWARD -i "$WAN_IF" -m mark ! --mark 0x1/0x1 -j NFQUEUE --queue-num 0 --queue-bypass
 
 # ===========================
 # NAT: Masquerade outbound traffic through WAN

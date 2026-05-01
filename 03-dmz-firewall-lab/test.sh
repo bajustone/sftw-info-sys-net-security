@@ -81,41 +81,81 @@ fi
 echo ""
 
 echo "========================================"
-echo " IDS (Suricata) Verification Tests"
+echo " IPS (Suricata) Verification Tests"
 echo "========================================"
 echo ""
 
-# Test 8: Suricata is running
-echo "--- Test 8: Suricata IDS is running ---"
-if docker exec firewall pgrep suricata > /dev/null 2>&1; then
-    pass "Suricata is running in the firewall container"
+# Test 8: Suricata is running in IPS (NFQUEUE) mode
+echo "--- Test 8: Suricata IPS is running (inline mode) ---"
+if docker exec firewall sh -c 'ps -ef 2>/dev/null | grep -v grep | grep -q "suricata.*-q 0"'; then
+    pass "Suricata running inline on NFQUEUE 0 (IPS mode)"
 else
-    fail "Suricata is not running"
+    fail "Suricata is not running in NFQUEUE mode"
 fi
 echo ""
 
-# Test 9: Suricata detects nmap scan
-echo "--- Test 9: Suricata detects nmap SYN scan ---"
+# Reset any prior blocks + logs so this run is reproducible
+docker exec firewall ipset flush suricata_block 2>/dev/null || true
 docker exec firewall sh -c '> /var/log/suricata/fast.log' 2>/dev/null
-docker exec attacker nmap -sS -T4 --top-ports 20 10.0.0.2 > /dev/null 2>&1
-sleep 3
-ALERTS=$(docker exec firewall cat /var/log/suricata/fast.log 2>/dev/null | grep -i "scan" | head -5)
-if [ -n "$ALERTS" ]; then
-    pass "Suricata generated scan alerts"
-    echo "  Sample alerts:"
-    echo "$ALERTS" | head -3 | sed 's/^/    /'
+docker exec firewall sh -c '> /var/log/suricata/blocked.log' 2>/dev/null
+
+# Test 9: Attack simulation — Nmap -A aggressive scan from Kali attacker (evaluation item 3)
+echo "--- Test 9: Attack Simulation — nmap -A from attacker ---"
+docker exec attacker nmap -A -T4 --top-ports 50 --max-retries 1 --host-timeout 30s 10.0.0.2 > /dev/null 2>&1 || true
+sleep 4
+
+# Test 10: Drops recorded in fast.log (evaluation item 5)
+echo "--- Test 10: Suricata logged drop events ---"
+DROPS=$(docker exec firewall sh -c 'grep -c "\[Drop\]" /var/log/suricata/fast.log 2>/dev/null || echo 0')
+DROPS=${DROPS//[^0-9]/}
+DROPS=${DROPS:-0}
+if [ "$DROPS" -gt 0 ]; then
+    pass "Suricata dropped $DROPS packets during the scan"
+    echo "  Sample drops:"
+    docker exec firewall grep "\[Drop\]" /var/log/suricata/fast.log | head -3 | sed 's/^/    /'
 else
-    fail "No scan alerts generated (Suricata may need more time or rules may not be loaded)"
+    fail "No drop events in fast.log"
 fi
 echo ""
 
-# Test 10: IDS mode confirmation (traffic still passes despite alerts)
-echo "--- Test 10: IDS mode - traffic NOT blocked after alerts ---"
-RESULT=$(docker exec attacker curl -s --max-time 5 http://10.0.0.2:80 2>/dev/null)
-if echo "$RESULT" | grep -q "DMZ Web Server"; then
-    pass "IDS mode confirmed — traffic still passes (alerts generated, not blocked)"
+# Test 11: Attacker IP in blocked list (evaluation item 4)
+echo "--- Test 11: Attacker IP 10.0.0.100 in suricata_block ipset ---"
+if docker exec firewall ipset test suricata_block 10.0.0.100 2>/dev/null; then
+    pass "10.0.0.100 is in the blocked set (SRC Block Offenders active)"
 else
-    fail "Traffic appears blocked — this should not happen in IDS mode"
+    fail "Attacker IP not added to blocked set — block-offenders daemon may not be running"
+fi
+echo ""
+
+# Test 12: Follow-up connections fail (evaluation item 4 — "failed connection")
+echo "--- Test 12: Follow-up HTTP from attacker is BLOCKED ---"
+if docker exec attacker curl -s --max-time 3 http://10.0.0.2:80 2>/dev/null | grep -q "DMZ Web Server"; then
+    fail "Attacker can still reach DMZ — prevention not working"
+else
+    pass "Follow-up HTTP from attacker fails (connection dropped by ipset rule)"
+fi
+echo ""
+
+# Test 13: Follow-up ping also blocked
+echo "--- Test 13: Follow-up ping from attacker is BLOCKED ---"
+if docker exec attacker ping -c 2 -W 2 10.0.0.2 > /dev/null 2>&1; then
+    fail "Attacker ping still succeeds — prevention not working"
+else
+    pass "Follow-up ping from attacker fails"
+fi
+echo ""
+
+# Test 14: blocked.log audit entry present (evaluation item 5)
+echo "--- Test 14: blocked.log contains audit entry ---"
+ENTRIES=$(docker exec firewall sh -c 'wc -l < /var/log/suricata/blocked.log 2>/dev/null || echo 0')
+ENTRIES=${ENTRIES//[^0-9]/}
+ENTRIES=${ENTRIES:-0}
+if [ "$ENTRIES" -gt 0 ]; then
+    pass "blocked.log has $ENTRIES audit entries"
+    echo "  Most recent:"
+    docker exec firewall tail -3 /var/log/suricata/blocked.log | sed 's/^/    /'
+else
+    fail "blocked.log is empty"
 fi
 echo ""
 
@@ -126,3 +166,9 @@ docker exec firewall iptables -L -v -n --line-numbers
 echo ""
 echo "--- NAT Rules ---"
 docker exec firewall iptables -t nat -L -v -n --line-numbers
+echo ""
+echo "--- ipset suricata_block ---"
+docker exec firewall ipset list suricata_block | head -15
+
+echo ""
+echo "Tip: clear blocks between runs with 'bash view-blocked.sh --flush'"
